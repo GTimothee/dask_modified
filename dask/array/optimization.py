@@ -23,7 +23,7 @@ GETNOREMOVE = (getter, getter_nofancy)
 
 
 def optimize(dsk, keys, fuse_keys=None, fast_functions=None,
-             inline_functions_fast_functions=(getter_inline,), rename_fused_keys=True,
+             inline_functions_fast_functions=(getter_inline,), rename_fused_keys=True, 
              **kwargs):
     """ Optimize dask for array computation
 
