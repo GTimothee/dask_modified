@@ -102,7 +102,7 @@ def slice_array(out_name, in_name, blockdims, index):
       This is the dask variable name that will be used as input
     out_name - string
       This is the dask variable output name
-    blockshape - iterable of integers
+    blockdims - iterable of integers
     index - iterable of integers, slices, lists, or None
 
     Returns
