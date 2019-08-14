@@ -10,7 +10,7 @@ from optimize_io.main import *
 def optimize_func(dsk, keys):
     t = time.time()
     dask_graph = dsk.dicts
-    dask_graph = main(dask_graph)
+    dask_graph = clustered_optimization(dask_graph)
     t = time.time() - t
     print("time to create graph:", t)
     return dsk

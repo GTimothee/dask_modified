@@ -195,6 +195,17 @@ def collections_to_dsk(collections, optimize_graph=True, **kwargs):
     else:
         dsk, _ = _extract_graph_and_keys(collections)
 
+
+    """nb_getitems = 0
+    getitems=list()
+    for k, v in dsk.items():
+        if isinstance(k, tuple) and 'getitem' == k[0].split('-')[0]:
+            nb_getitems += 1
+            getitems.append(k)
+    
+    print(getitems)
+    print("nb_getittems", len(getitems))"""
+
     return dsk
 
 
