@@ -494,13 +494,13 @@ def get_async(apply_async, num_workers, dsk, result, cache=None,
                         return mem
 
                     val = dsk[key]
+                    # print(val)
                     threshold = 1000000000
-                    print("val", val)
-                    if isinstance(val, tuple) and len(val) == 3 and isinstance(val[1], tuple) and isinstance(val[1][0], str) and 'merged' in val[1][0]:
+                    if isinstance(val, tuple) and len(val) == 3 and isinstance(val[1], str) and 'original' in val[1]:
                         mem_consumed = get_mem('cache') + get_mem('loading') + get_mem(val[2])
-                        print("key", key)
-                        print("consumed", mem_consumed)
                         if mem_consumed > threshold:
+
+                            print("expected", mem_consumed)
                             state['delayed_loading'].add(key)
                             print("[INFO] delayed task:", key)
                             key = None
