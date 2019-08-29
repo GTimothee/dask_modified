@@ -283,6 +283,12 @@ def finish_task(dsk, key, state, results, sortkey, delete=True,
     state['finished'].add(key)
     state['running'].remove(key)
 
+    #-------------- start tim
+    if 'loading' in state.keys():
+        if key in state['loading']:
+            del state['loading'][key]
+    #-------------- end tim
+
     return state
 
 
@@ -400,6 +406,25 @@ def get_async(apply_async, num_workers, dsk, result, cache=None,
     results = set(result_flat)
 
     dsk = dict(dsk)
+
+    #-------------- start tim
+    def neat_print_graph(graph):
+        s = "-------------------"
+        print(s)
+        print(s)
+        print(s)
+        for k, v in graph.items():
+            print("\nkey", k)
+            if isinstance(v, dict):
+                for k2, v2 in v.items():
+                    print("\nk", k2)
+                    print(v2, "\n")
+            else:
+                print(v, "\n")
+
+    # neat_print_graph(dsk)
+    #-------------- end tim
+
     with local_callbacks(callbacks) as callbacks:
         _, _, pretask_cbs, posttask_cbs, _ = unpack_callbacks(callbacks)
         started_cbs = []
@@ -427,10 +452,84 @@ def get_async(apply_async, num_workers, dsk, result, cache=None,
             if state['waiting'] and not state['ready']:
                 raise ValueError("Found no accessible jobs in dask")
 
+            
+
+            def fire_task_tim():
+                """ Fire off a task to the thread pool """
+                # Choose a good task to compute
+
+                #-------------- start tim
+                import sys
+
+                key = None
+                while state['ready'] and not key:
+                    key = state['ready'].pop()
+
+                    def get_mem(_source):
+                        mem = 0
+                        if isinstance(_source, str):
+                            # get mem of cache
+                            if not _source in state.keys():
+                                raise ValueError("not supported")
+
+                            state_key = _source
+                            _source = state[state_key]
+
+                            if state_key == 'cache':
+                                for _, v in _source.items():
+                                    mem += sys.getsizeof(v)
+                            
+                            elif state_key == 'loading':
+                                # get mem of loading
+                                for _, v in _source.items():
+                                    mem += v
+                            else:
+                                raise ValueError("not supported")
+
+                        else:
+                            # get mem from slices
+                            slices = _source
+                            values = [s.stop - s.start for s in slices]
+                            mem = values[0] * values[1] * values[2] * 4  # 4 bytes, to be modified
+                        return mem
+
+                    val = dsk[key]
+                    threshold = 1000000000
+                    print("val", val)
+                    if isinstance(val, tuple) and len(val) == 3 and isinstance(val[1], tuple) and isinstance(val[1][0], str) and 'merged' in val[1][0]:
+                        mem_consumed = get_mem('cache') + get_mem('loading') + get_mem(val[2])
+                        print("key", key)
+                        print("consumed", mem_consumed)
+                        if mem_consumed > threshold:
+                            state['delayed_loading'].add(key)
+                            print("[INFO] delayed task:", key)
+                            key = None
+                        else:
+                            state['loading'].update({key: get_mem(val[2])})
+                if not key:
+                    return
+
+                #------------- end tim
+
+                print(">> Launching task", key)
+                state['running'].add(key)
+                for f in pretask_cbs:
+                    f(key, dsk, state)
+
+                # Prep data to send
+                data = dict((dep, state['cache'][dep])
+                            for dep in get_dependencies(dsk, key))
+                # Submit
+                apply_async(execute_task,
+                            args=(key, dumps((dsk[key], data)),
+                                    dumps, loads, get_id, pack_exception),
+                            callback=queue.put)
+
             def fire_task():
                 """ Fire off a task to the thread pool """
                 # Choose a good task to compute
                 key = state['ready'].pop()
+                # print("launch task", key)
                 state['running'].add(key)
                 for f in pretask_cbs:
                     f(key, dsk, state)
@@ -444,13 +543,29 @@ def get_async(apply_async, num_workers, dsk, result, cache=None,
                                   dumps, loads, get_id, pack_exception),
                             callback=queue.put)
 
+
+            #-------------- start tim
+            try:
+                if config.get("io-optimizer") and config.get("io-optimizer.scheduler_opti"):
+                    state['loading'] = dict()
+                    state['delayed_loading'] = set()
+                    fire_func = fire_task_tim
+            except:
+                fire_func = fire_task
+            #-------------- end tim
+
+
             # Seed initial tasks into the thread pool
             while state['ready'] and len(state['running']) < num_workers:
-                fire_task()
+                fire_func()
 
             # Main loop, wait on tasks to finish, insert new ones
             while state['waiting'] or state['ready'] or state['running']:
+
+                # t: get result from one running task (the first finishing task)
                 key, res_info, failed = queue_get(queue)
+
+                # t: handle failure
                 if failed:
                     exc, tb = loads(res_info)
                     if rerun_exceptions_locally:
@@ -460,14 +575,26 @@ def get_async(apply_async, num_workers, dsk, result, cache=None,
                         _execute_task(task, data)  # Re-execute locally
                     else:
                         raise_exception(exc, tb)
+
+                # t: store results
                 res, worker_id = loads(res_info)
                 state['cache'][key] = res
                 finish_task(dsk, key, state, results, keyorder.get)
                 for f in posttask_cbs:
                     f(key, res, dsk, state, worker_id)
 
+                #-------------- start tim
+                
+                if 'delayed_loading' in state.keys():
+                    for e in state['delayed_loading']:
+                        state['ready'].insert(0, e)
+                    state['delayed_loading'] = set()
+
+                #-------------- end tim
+
+                # t: rajoute de nouvelles tâches
                 while state['ready'] and len(state['running']) < num_workers:
-                    fire_task()
+                    fire_func()
 
             succeeded = True
 

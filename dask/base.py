@@ -409,12 +409,6 @@ def compute(*args, **kwargs):
     results = schedule(dsk, keys, **kwargs)
     return repack([f(r, *a) for r, (f, a) in zip(results, postcomputes)])
 
-def print_dask_graph(dask_graph):
-        print("dask_graph")
-        for key, val in dask_graph.items():
-            if not 'array-' in key:
-                print("key", key, "\n")
-                print("val", val, "\n\n")
 
 def visualize(*args, **kwargs):
     """
