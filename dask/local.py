@@ -494,11 +494,11 @@ def get_async(apply_async, num_workers, dsk, result, cache=None,
                         return mem
 
                     val = dsk[key]
-                    # print(val)
-                    threshold = 1000000000
+                    ONE_GIG = 1000000000
+                    threshold = 5 * ONE_GIG
                     if isinstance(val, tuple) and len(val) == 3 and isinstance(val[1], str) and 'original' in val[1]:
                         mem_consumed = get_mem('cache') + get_mem('loading') + get_mem(val[2])
-                        if mem_consumed > threshold:
+                        if mem_consumed > threshold and state['running']:
 
                             print("expected", mem_consumed)
                             state['delayed_loading'].add(key)
@@ -529,7 +529,7 @@ def get_async(apply_async, num_workers, dsk, result, cache=None,
                 """ Fire off a task to the thread pool """
                 # Choose a good task to compute
                 key = state['ready'].pop()
-                # print("launch task", key)
+                print("--launching task", key)
                 state['running'].add(key)
                 for f in pretask_cbs:
                     f(key, dsk, state)
@@ -550,6 +550,8 @@ def get_async(apply_async, num_workers, dsk, result, cache=None,
                     state['loading'] = dict()
                     state['delayed_loading'] = set()
                     fire_func = fire_task_tim
+                else:
+                    fire_func = fire_task
             except:
                 fire_func = fire_task
             #-------------- end tim
