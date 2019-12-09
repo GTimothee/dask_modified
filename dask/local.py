@@ -520,6 +520,14 @@ def get_async(apply_async, num_workers, dsk, result, cache=None,
                 data = dict((dep, state['cache'][dep])
                             for dep in get_dependencies(dsk, key))
                 # Submit
+                def execute_task2(key, task_info, dumps, loads, get_id, pack_exception):
+                    # temporary
+                    result = "some data"
+                    import time
+                    time.sleep(1)
+                    failed = False
+                    return key, result, failed
+
                 apply_async(execute_task,
                             args=(key, dumps((dsk[key], data)),
                                     dumps, loads, get_id, pack_exception),
@@ -545,6 +553,7 @@ def get_async(apply_async, num_workers, dsk, result, cache=None,
 
 
             #-------------- start tim
+            # select the good fire_task to use
             try:
                 if config.get("io-optimizer") and config.get("io-optimizer.scheduler_opti"):
                     state['loading'] = dict()
