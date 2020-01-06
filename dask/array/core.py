@@ -3954,7 +3954,7 @@ def to_npy_stack(dirname, x, axis=0):
         os.mkdir(dirname)
 
     meta = {'chunks': chunks, 'dtype': x.dtype, 'axis': axis}
-
+    
     with open(os.path.join(dirname, 'info'), 'wb') as f:
         pickle.dump(meta, f)
 
@@ -3963,7 +3963,8 @@ def to_npy_stack(dirname, x, axis=0):
            for i, key in enumerate(core.flatten(xx.__dask_keys__()))}
 
     graph = HighLevelGraph.from_collections(name, dsk, dependencies=[xx])
-    compute_as_if_collection(Array, graph, list(dsk))
+    # compute_as_if_collection(Array, graph, list(dsk))
+    return Array, graph, list(dsk) 
 
 
 def from_npy_stack(dirname, mmap_mode='r'):

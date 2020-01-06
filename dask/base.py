@@ -157,13 +157,7 @@ class DaskMethodsMixin(object):
         return result
 
 
-def compute_as_if_collection(cls, dsk, keys, scheduler=None, get=None, **kwargs):
-    """Compute a graph as if it were of type cls.
 
-    Allows for applying the same optimizations and default scheduler."""
-    schedule = get_scheduler(scheduler=scheduler, cls=cls, get=get)
-    dsk2 = optimization_function(cls)(ensure_dict(dsk), keys, **kwargs)
-    return schedule(dsk2, keys, **kwargs)
 
 
 def dont_optimize(dsk, keys, **kwargs):
@@ -194,17 +188,6 @@ def collections_to_dsk(collections, optimize_graph=True, **kwargs):
                          for opt, (dsk, keys) in groups.items()]))
     else:
         dsk, _ = _extract_graph_and_keys(collections)
-
-
-    """nb_getitems = 0
-    getitems=list()
-    for k, v in dsk.items():
-        if isinstance(k, tuple) and 'getitem' == k[0].split('-')[0]:
-            nb_getitems += 1
-            getitems.append(k)
-    
-    print(getitems)
-    print("nb_getittems", len(getitems))"""
 
     return dsk
 
@@ -409,6 +392,23 @@ def compute(*args, **kwargs):
     results = schedule(dsk, keys, **kwargs)
     return repack([f(r, *a) for r, (f, a) in zip(results, postcomputes)])
 
+
+def compute_as_if_collection(cls, dsk, keys, scheduler=None, get=None, opti=False, **kwargs):
+    """Compute a graph as if it were of type cls.
+
+    Allows for applying the same optimizations and default scheduler."""
+    schedule = get_scheduler(scheduler=scheduler, cls=cls, get=get)
+    """import optimize_io
+    from optimize_io import optimize_func
+    config.set({'io-optimizer': {
+                    'memory_available': 5500000000,
+                    'scheduler_opti': True}
+    })
+
+    dsk = optimize_func(dsk, None)"""
+    dsk2 = optimization_function(cls)(ensure_dict(dsk), keys, **kwargs)
+    return schedule(dsk2, keys, **kwargs)
+    
 
 def visualize(*args, **kwargs):
     """
